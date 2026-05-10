@@ -13,11 +13,11 @@ jobs:
       - name: Get latest code
         uses: actions/checkout@v4
 
-      - name: Update Service
-        run: |
+      # - name: Update Service
+       # run: |
           # The agent runs in its own folder; we move to your app folder
-          cd /home/woodhouses/actions-runner/_work
-          git pull origin main
+        #  cd /home/woodhouses/actions-runner/_work
+         # git pull origin main
 
           # copy to opt
           # sudo cp -a ./Desktop/pinger/. /opt/pinger/
