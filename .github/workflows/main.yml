@@ -13,30 +13,30 @@ jobs:
       - name: Get latest code
         uses: actions/checkout@v4
 
-       - name: Update Service
+      - name: Update Service
         run: |
           # copy the code to the service location
-           sudo cp -a /home/woodhouses/actions-runner/_work/pinger/. /opt/pinger/ 
+          sudo cp -a /home/woodhouses/actions-runner/_work/pinger/. /opt/pinger/ 
           # copy over the service file
-           sudo cp /opt/pinger/systemd/pinger.service /etc/systemd/system/pinger.service
+          sudo cp /opt/pinger/systemd/pinger.service /etc/systemd/system/pinger.service
 
           # stop the service
-           sudo systemctl daemon-reload
-           sudo systemctl stop pinger
+          sudo systemctl daemon-reload
+          sudo systemctl stop pinger
           
           # update some permissions
-           sudo chown -R pinger:pinger /opt/pinger
-           sudo chmod -R u+rx /opt/pinger/venv/bin/
-           sudo chmod u+rx /opt /opt/pinger /opt/pinger/venv /opt/pinger/venv/bin
+          sudo chown -R pinger:pinger /opt/pinger
+          sudo chmod -R u+rx /opt/pinger/venv/bin/
+          sudo chmod u+rx /opt /opt/pinger /opt/pinger/venv /opt/pinger/venv/bin
 
           # python refresh
           sudo -u pinger /opt/pinger/venv/bin/pip install --force-reinstall /opt/pinger
 
           # update some permissions
-           sudo chown -R pinger:pinger /opt/pinger
-           sudo chmod -R u+rx /opt/pinger/venv/bin/
-           sudo chmod u+rx /opt /opt/pinger /opt/pinger/venv /opt/pinger/venv/bin
+          sudo chown -R pinger:pinger /opt/pinger
+          sudo chmod -R u+rx /opt/pinger/venv/bin/
+          sudo chmod u+rx /opt /opt/pinger /opt/pinger/venv /opt/pinger/venv/bin
 
           # start the service
-           sudo systemctl daemon-reload
-           sudo systemctl start pinger
+          sudo systemctl daemon-reload
+          sudo systemctl start pinger
