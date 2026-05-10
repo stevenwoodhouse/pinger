@@ -1,0 +1,30 @@
+name: Deploy Python to Pi
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    # This magic line tells GitHub to find YOUR Pi agent
+    runs-on: self-hosted  
+    
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Update Service
+        run: |
+          # The agent runs in its own folder; we move to your app folder
+          cd /home/woodhouses/actions-runner/_work
+          git pull origin main
+
+          # copy to opt
+          # sudo cp -a ./Desktop/pinger/. /opt/pinger/
+          
+          # Standard Python refresh
+          # source venv/bin/activate
+          # pip install -r requirements.txt
+          
+          # Restart the background service (see Phase 3)
+          # sudo systemctl restart my_python_app.service
