@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pinger"
+version = "1.0.2"
+description = "LAN ping monitor service for Raspberry Pi"
+requires-python = ">=3.10"
+dependencies = [
+  "Flask>=3.0.0",
+  "waitress>=3.0.0",
+  "APScheduler>=3.10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

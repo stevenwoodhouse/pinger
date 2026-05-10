@@ -1,0 +1,41 @@
+[Unit]
+Description=LAN ping monitor (Pinger)
+# Do not use network-online.target: on Wi-Fi / DHCP it often never reaches "online", which leaves
+# this job stuck "activating" forever. Interfaces are normally up enough for bind(0.0.0.0) after:
+After=network.target
+
+[Service]
+Type=simple
+User=pinger
+Group=pinger
+# Use the service user's writable home — not /opt/pinger. If WorkingDirectory=/opt/pinger while that
+# tree is root-owned mode 0750/0700, systemd fails at CHDIR ("Permission denied") before ExecStart.
+WorkingDirectory=/var/lib/pinger
+# Services often inherit a bare PATH so `ping` / `ip` are not found; keep standard locations.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=PINGER_DATA_DIR=/var/lib/pinger
+Environment=PINGER_HOST=0.0.0.0
+Environment=PINGER_PORT=8765
+# Half-hour sweeps (override in drop-in)
+Environment=PINGER_INTERVAL_SEC=1800
+# Auto-detect private IPv4 LAN; set explicitly if needed, e.g. 192.168.1.0/24
+# Environment=PINGER_NETWORK_CIDR=192.168.1.0/24
+# User= must EXECUTE python and traverse every directory in the path. If logs say
+# "Failed to execute /opt/pinger/venv/bin/python: Permission denied":
+#   sudo namei -l /opt/pinger/venv/bin/python
+#   sudo chown -R pinger:pinger /opt/pinger
+#   sudo chmod u+rx /opt/pinger /opt/pinger/venv /opt/pinger/venv/bin
+#   sudo chmod -R u+rx /opt/pinger/venv/bin/*
+#   findmnt /opt   # if "noexec", move the app off that mount or remount
+# Verify: sudo -u pinger /opt/pinger/venv/bin/python -V
+ExecStart=/opt/pinger/venv/bin/python -m pinger
+Restart=on-failure
+RestartSec=5
+# Allow binding to low ports if you change PINGER_PORT to <1024 (not default)
+# AmbientCapabilities=CAP_NET_BIND_SERVICE
+# Ping needs raw ICMP or the binary may be setuid; Debian/Ubuntu often allows unprivileged ping.
+# If icmp fails, grant cap: setcap cap_net_raw+ep /bin/ping (distro-specific)
+
+[Install]
+WantedBy=multi-user.target
