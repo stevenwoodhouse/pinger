@@ -29,6 +29,7 @@ from pinger import mail as mailer
 
 STYLES_CORE = r"""
     :root {
+      color-scheme: dark;
       --bg: #0f1419;
       --panel: #1a2332;
       --text: #e7ecf3;
@@ -36,12 +37,42 @@ STYLES_CORE = r"""
       --up: #3ecf8e;
       --down: #f07178;
       --accent: #5aa7ff;
+      --border: #243049;
+      --border-input: #2c3d5c;
+      --border-card: #263652;
+      --btn-primary-border: #3f5e8a;
+      --btn-primary-bg: #223149;
+      --btn-primary-hover: #2a3c5c;
+      --gradient-spot: #1b2a44;
+      --card-grad-a: #1c2738;
+      --pill-up-bg: #163d2c;
+      --pill-down-bg: #3a1f24;
+      --pill-unk-bg: #2a2f3a;
+      --spark-mid: #2c3548;
+      --pref-inner-bg: #152238;
+      --pref-inner-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+      --code-bg: #243049;
+      --upt-bar-row-border: #2a3548;
+      --upt-stack-border: #3a5070;
+      --upt-stack-bg: #141c2a;
+      --upt-seg-up-a: #4dd69a;
+      --upt-seg-up-b: #2a8f5f;
+      --upt-seg-down-a: #fb9aa4;
+      --upt-seg-down-b: #c84855;
+      --upt-seg-unk-a: #2c3548;
+      --upt-seg-unk-b: #252f40;
+      --upt-seg-unk-border-t: #3d4a61;
+      --upt-seg-unk-border-b: #3d4a61;
+      --upt-day-sub: #7286a8;
+      --upt-mini-border: #354560;
+      --upt-leg-unk-bg: #3a465c;
+      --upt-leg-unk-border: #4d5f7a;
     }
     * { box-sizing: border-box; }
     html { overflow-x: hidden; }
     body {
       margin: 0; font-family: ui-sans-serif, system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 20% -10%, #1b2a44 0%, var(--bg) 55%);
+      background: radial-gradient(1200px 600px at 20% -10%, var(--gradient-spot) 0%, var(--bg) 55%);
       color: var(--text); min-height: 100vh;
       overflow-x: hidden;
       width: 100%;
@@ -54,7 +85,7 @@ STYLES_CORE = r"""
     }
     header {
       padding: 1rem clamp(0.75rem, 3vw, 1.25rem);
-      border-bottom: 1px solid #243049;
+      border-bottom: 1px solid var(--border);
       display: flex; flex-wrap: wrap; gap: .75rem 1rem;
       align-items: baseline; justify-content: space-between;
       width: 100%;
@@ -73,13 +104,13 @@ STYLES_CORE = r"""
       min-width: 0;
     }
     button, input[type=text], input[type=email], input[type=password] {
-      background: var(--panel); border: 1px solid #2c3d5c;
+      background: var(--panel); border: 1px solid var(--border-input);
       color: var(--text); padding: .45rem .7rem; border-radius: 8px;
       font: inherit;
     }
     button { cursor: pointer; }
-    button.primary { border-color: #3f5e8a; background: #223149; }
-    button.primary:hover { background: #2a3c5c; }
+    button.primary { border-color: var(--btn-primary-border); background: var(--btn-primary-bg); }
+    button.primary:hover { background: var(--btn-primary-hover); }
     .grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -88,8 +119,8 @@ STYLES_CORE = r"""
       min-width: 0;
     }
     .card {
-      background: linear-gradient(160deg, #1c2738 0%, var(--panel) 100%);
-      border: 1px solid #263652; border-radius: 12px; padding: 1rem 1.1rem;
+      background: linear-gradient(160deg, var(--card-grad-a) 0%, var(--panel) 100%);
+      border: 1px solid var(--border-card); border-radius: 12px; padding: 1rem 1.1rem;
       width: 100%;
       min-width: 0;
       max-width: 100%;
@@ -123,9 +154,9 @@ STYLES_CORE = r"""
       display: inline-block; padding: .15rem .55rem; border-radius: 999px;
       font-size: .75rem; font-weight: 600; letter-spacing: .03em;
     }
-    .pill.up { background: #163d2c; color: var(--up); }
-    .pill.down { background: #3a1f24; color: var(--down); }
-    .pill.unk { background: #2a2f3a; color: var(--muted); }
+    .pill.up { background: var(--pill-up-bg); color: var(--up); }
+    .pill.down { background: var(--pill-down-bg); color: var(--down); }
+    .pill.unk { background: var(--pill-unk-bg); color: var(--muted); }
     pre {
       margin: .6rem 0 0; font-size: .78rem; color: var(--muted);
       white-space: pre-wrap; word-break: break-word;
@@ -145,11 +176,11 @@ STYLES_CORE = r"""
       flex: 1 1 3px;
       min-width: 3px;
       border-radius: 2px;
-      background: #2c3548;
+      background: var(--spark-mid);
     }
     .spark i.on { background: var(--up); }
     .spark i.off { background: var(--down); }
-    .spark i.unk { background: #2c3548; }
+    .spark i.unk { background: var(--spark-mid); }
     form.inline { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; min-width: 0; }
     form.inline input[type=text] { flex: 1 1 8rem; min-width: 0; }
     .dash-settings {
@@ -161,8 +192,8 @@ STYLES_CORE = r"""
       border: 2px solid var(--accent);
       border-radius: 12px;
       padding: 1rem 1.05rem 0.95rem;
-      background: #152238;
-      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+      background: var(--pref-inner-bg);
+      box-shadow: var(--pref-inner-shadow);
       max-width: 100%;
     }
     .settings-heading {
@@ -224,7 +255,7 @@ STYLES_CORE = r"""
     }
     .smtp-grid select {
       background: var(--panel);
-      border: 1px solid #2c3d5c;
+      border: 1px solid var(--border-input);
       color: var(--text);
       padding: 0.45rem 0.7rem;
       border-radius: 8px;
@@ -243,16 +274,66 @@ STYLES_CORE = r"""
       form.inline { flex-direction: column; align-items: stretch; }
       form.inline button { width: 100%; }
     }
+    code {
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.88em;
+      color: var(--text);
+    }
     a { color: var(--accent); }
     .navlinks { margin-top: .35rem; font-size: .88rem; }
     .navlinks a { font-weight: 500; }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        color-scheme: light;
+        --bg: #f0f4fa;
+        --panel: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --up: #059669;
+        --down: #dc2626;
+        --accent: #2563eb;
+        --border: #cbd5e1;
+        --border-input: #94a3b8;
+        --border-card: #cbd5e1;
+        --btn-primary-border: #2563eb;
+        --btn-primary-bg: #eff6ff;
+        --btn-primary-hover: #dbeafe;
+        --gradient-spot: #dbeafe;
+        --card-grad-a: #ffffff;
+        --pill-up-bg: #d1fae5;
+        --pill-down-bg: #fee2e2;
+        --pill-unk-bg: #e2e8f0;
+        --spark-mid: #cbd5e1;
+        --pref-inner-bg: #f8fafc;
+        --pref-inner-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+        --code-bg: #e2e8f0;
+        --upt-bar-row-border: #e2e8f0;
+        --upt-stack-border: #94a3b8;
+        --upt-stack-bg: #f1f5f9;
+        --upt-seg-up-a: #34d399;
+        --upt-seg-up-b: #059669;
+        --upt-seg-down-a: #fb7185;
+        --upt-seg-down-b: #e11d48;
+        --upt-seg-unk-a: #e2e8f0;
+        --upt-seg-unk-b: #f1f5f9;
+        --upt-seg-unk-border-t: #cbd5e1;
+        --upt-seg-unk-border-b: #cbd5e1;
+        --upt-day-sub: #64748b;
+        --upt-mini-border: #94a3b8;
+        --upt-leg-unk-bg: #e2e8f0;
+        --upt-leg-unk-border: #94a3b8;
+      }
+    }
 """
 
 STYLES_UPTIME_EXTRA = r"""
     .upt-filters { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.25rem; }
     .upt-filters label { color: var(--muted); font-size: .88rem; }
     select.upt-select {
-      background: var(--panel); border: 1px solid #2c3d5c; color: var(--text);
+      background: var(--panel); border: 1px solid var(--border-input); color: var(--text);
       padding: .45rem .6rem; border-radius: 8px; font: inherit; min-width: 0; flex: 1 1 12rem;
       max-width: 100%;
     }
@@ -266,7 +347,7 @@ STYLES_UPTIME_EXTRA = r"""
     .upt-leg i { font-style: normal; display:inline-block; width:.65rem;height:.65rem;margin-right:.25rem;border-radius:2px;vertical-align:middle;}
     .upt-leg i.up { background: var(--up); }
     .upt-leg i.down { background: var(--down); }
-    .upt-leg i.unk { background: #3a465c; border: 1px solid #4d5f7a;}
+    .upt-leg i.unk { background: var(--upt-leg-unk-bg); border: 1px solid var(--upt-leg-unk-border);}
     .upt-section-title { margin: .75rem 0 .35rem 0; font-size: .95rem; font-weight: 600; letter-spacing:.02em; }
     .upt-hour-head { margin: 1rem 0 .4rem 0; font-size: .9rem; color: var(--text); font-weight: 600;}
     .upt-bar-row {
@@ -274,22 +355,22 @@ STYLES_UPTIME_EXTRA = r"""
       gap: clamp(4px, 1.4vw, 10px); align-items: flex-end; justify-content: space-between;
       min-height: 152px;
       padding: .35rem .15rem .2rem 0;
-      border-bottom: 1px solid #2a3548;
+      border-bottom: 1px solid var(--upt-bar-row-border);
       overflow-x: auto;
     }
     .upt-col { flex: 1 1 0; min-width: clamp(38px, 8vw, 52px); max-width: 64px;
       display: flex; flex-direction: column; align-items: center; gap: .38rem;}
     .upt-stack {
       width: 100%; height: 128px;
-      border: 1px solid #3a5070; border-radius: 8px; overflow: hidden;
+      border: 1px solid var(--upt-stack-border); border-radius: 8px; overflow: hidden;
       display: flex; flex-direction: column;
       cursor: pointer; text-decoration: none; color: inherit;
       outline-offset: 2px;
       box-sizing: border-box;
-      background: #141c2a;
+      background: var(--upt-stack-bg);
     }
-    .upt-stack:hover { border-color: #5aa7ff; }
-    .upt-stack.sel { box-shadow: 0 0 0 2px #5aa7ff; border-color: #5aa7ff; }
+    .upt-stack:hover { border-color: var(--accent); }
+    .upt-stack.sel { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
     .upt-stack.empty { cursor: pointer; }
     .upt-seg {
       flex: none;
@@ -297,24 +378,24 @@ STYLES_UPTIME_EXTRA = r"""
       min-height: 0;
       width: 100%;
     }
-    .upt-seg.up { background: linear-gradient(180deg, #4dd69a 0%, #2a8f5f 100%); }
-    .upt-seg.down { background: linear-gradient(180deg, #fb9aa4 0%, #c84855 100%); }
+    .upt-seg.up { background: linear-gradient(180deg, var(--upt-seg-up-a) 0%, var(--upt-seg-up-b) 100%); }
+    .upt-seg.down { background: linear-gradient(180deg, var(--upt-seg-down-a) 0%, var(--upt-seg-down-b) 100%); }
     .upt-seg.unk { background: repeating-linear-gradient(
-      -45deg, #2c3548, #2c3548 4px, #252f40 4px, #252f40 8px
-    ); border-top: 1px solid #3d4a61; border-bottom: 1px solid #3d4a61;
+      -45deg, var(--upt-seg-unk-a), var(--upt-seg-unk-a) 4px, var(--upt-seg-unk-b) 4px, var(--upt-seg-unk-b) 8px
+    ); border-top: 1px solid var(--upt-seg-unk-border-t); border-bottom: 1px solid var(--upt-seg-unk-border-b);
     }
     .upt-stack.empty .upt-seg.fill, .upt-mini .upt-seg.fill {
       height: 100% !important; min-height: 100%; opacity: .55;
     }
     .upt-day-lab { font-size: .62rem; color: var(--muted); text-align: center;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width:100%; max-width:100%; }
-    .upt-day-sub { font-size: .62rem; color: #7286a8; margin-top:.1rem; text-align:center; width:100%;}
+    .upt-day-sub { font-size: .62rem; color: var(--upt-day-sub); margin-top:.1rem; text-align:center; width:100%;}
     .upt-hour-grid { display: grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap: .4rem;}
     @media (max-width: 26rem){ .upt-hour-grid { grid-template-columns: repeat(6, minmax(0,1fr)); } }
     .upt-hour-slot { font-size:.58rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:.28rem;}
     .upt-mini {
-      width:100%; height:76px;border:1px solid #354560;border-radius:6px;overflow:hidden;
-      display:flex;flex-direction:column;background:#141c2a;
+      width:100%; height:76px;border:1px solid var(--upt-mini-border);border-radius:6px;overflow:hidden;
+      display:flex;flex-direction:column;background:var(--upt-stack-bg);
     }
     .upt-clear-day { margin: .65rem 0 0;font-size:.85rem;display:inline-block;}
 """
@@ -349,7 +430,7 @@ INDEX_HTML = (
     {% if sweep_started %}
     <p class="muted" style="margin:0 0 1rem 0;">
       Sweep is running in the background. Refresh the page after a short wait to see updates.
-      If nothing changes, check <code style="background:#243049;padding:2px 6px;border-radius:4px">sudo journalctl -u pinger -n 120 --no-pager</code>
+      If nothing changes, check <code>sudo journalctl -u pinger -n 120 --no-pager</code>
     </p>
     {% endif %}
     <div class="toolbar">
@@ -454,7 +535,7 @@ PREFERENCES_HTML = (
         <h3 class="settings-sub" id="smtp-heading">SMTP sender (optional)</h3>
         <p class="muted smtp-summary">Effective: {{ smtp_summary }}</p>
         <p class="muted settings-hint" style="margin-top:0;margin-bottom:.55rem">
-          Values here override the service environment (e.g. <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_*</code>). Leave a field empty to use the server default. A password stored in the database is kept in plain text — prefer environment variables for production secrets.
+          Values here override the service environment (e.g. <code>PINGER_SMTP_*</code>). Leave a field empty to use the server default. A password stored in the database is kept in plain text — prefer environment variables for production secrets.
         </p>
 
         <div class="smtp-grid" role="group" aria-labelledby="smtp-heading">
@@ -517,7 +598,7 @@ PREFERENCES_HTML = (
       <p class="muted" style="margin:.45rem 0 0;font-size:.88rem">Test email sent — check the inbox (and spam folder).</p>
       {% elif test_err %}
       <p class="muted" style="margin:.45rem 0 0;font-size:.88rem;color:var(--down)">
-        {% if test_err_reason == 'noaddr' %}Save an alert address above before sending a test.{% elif test_err_reason == 'nosmtp' %}No SMTP host is configured. Set SMTP host here or <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> on the server, then try again.{% else %}The test message could not be sent. Check SMTP settings and the service log.{% endif %}
+        {% if test_err_reason == 'noaddr' %}Save an alert address above before sending a test.{% elif test_err_reason == 'nosmtp' %}No SMTP host is configured. Set SMTP host here or <code>PINGER_SMTP_HOST</code> on the server, then try again.{% else %}The test message could not be sent. Check SMTP settings and the service log.{% endif %}
       </p>
       {% endif %}
       <p class="muted settings-hint" style="margin-top:.75rem">
