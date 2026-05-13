@@ -455,6 +455,8 @@ INDEX_HTML = (
       <div class="navlinks">
         <a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a>
         <span class="muted"> · </span>
+        <a href="{{ url_for('mac_groups_page') }}">MAC groups</a>
+        <span class="muted"> · </span>
         <a href="{{ url_for('preferences_page') }}">Preferences</a>
       </div>
     </div>
@@ -514,10 +516,25 @@ INDEX_HTML = (
         <p class="muted" style="margin:.55rem 0 0;font-size:.82rem">
           <a href="{{ url_for('uptime_page', device=d.id) }}">{{ retention }}d timeline for this device</a>
         </p>
+        {% if d.super_group_id %}
+        <form class="inline" method="post" action="{{ url_for('rename_mac_group_route', group_id=d.super_group_id) }}">
+          <input name="nickname" type="text" value="{{ d.super_nickname or '' }}" placeholder="MAC group nickname" required />
+          <button type="submit">Save group name</button>
+        </form>
+        <p class="muted" style="margin:.35rem 0 0;font-size:.78rem">
+          Grouped MACs · <a href="{{ url_for('mac_groups_page') }}">manage MAC groups</a>
+        </p>
+        {% else %}
         <form class="inline" method="post" action="{{ url_for('set_nickname', device_id=d.id) }}">
-          <input name="nickname" type="text" value="{{ d.nickname or '' }}" placeholder="Nickname" />
+          <input name="nickname" type="text" value="{{ d.row_nickname or '' }}" placeholder="Nickname" />
           <button type="submit">Save name</button>
         </form>
+        {% if d.mac %}
+        <p class="muted" style="margin:.35rem 0 0;font-size:.78rem">
+          <a href="{{ url_for('mac_groups_page') }}">Group this MAC with other MACs…</a>
+        </p>
+        {% endif %}
+        {% endif %}
       </div>
       {% else %}
       <p class="muted">No devices yet. Run a sweep or add an IP to watch.</p>
@@ -555,6 +572,8 @@ PREFERENCES_HTML = (
         <a href="{{ url_for('index') }}">Dashboard</a>
         <span class="muted"> · </span>
         <a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('mac_groups_page') }}">MAC groups</a>
       </div>
     </div>
     <div class="muted">Server time: {{ now }}</div>
@@ -679,6 +698,8 @@ UPTIME_HTML = (
         <span class="muted"> · </span>
         <a href="{{ url_for('preferences_page') }}">Preferences</a>
         <span class="muted"> · </span>
+        <a href="{{ url_for('mac_groups_page') }}">MAC groups</a>
+        <span class="muted"> · </span>
         <a href="{{ url_for('uptime_page') }}">All devices</a>
       </div>
     </div>
@@ -760,6 +781,171 @@ UPTIME_HTML = (
     {% else %}
     <p class="muted">No devices yet.</p>
     {% endfor %}
+  </main>
+  <footer class="app-footer">
+    Pinger v{{ version }} · Deployed: {{ deployed }}
+  </footer>
+  </div>
+</body>
+</html>
+"""
+)
+
+MAC_GROUPS_HTML = (
+    r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Pinger — MAC groups</title>
+  <style>"""
+    + STYLES_CORE
+    + r"""
+    .mg-card { margin-bottom: 1rem; }
+    .mg-member-list { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .25rem; }
+    .mg-chip {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--code-bg); border-radius: 999px; padding: .15rem .55rem;
+      font-family: ui-monospace, monospace; font-size: .8rem;
+    }
+    .mg-chip form { display: inline; margin: 0; }
+    .mg-chip button {
+      background: transparent; border: none; color: var(--down);
+      padding: 0; cursor: pointer; font: inherit; font-size: 1rem; line-height: 1;
+    }
+    .mg-chip button:hover { color: var(--accent); }
+    .mg-form { display: flex; flex-direction: column; gap: .55rem; margin-top: .75rem; }
+    .mg-form .mg-row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+    .mg-form input[type=text] { flex: 1 1 14rem; min-width: 0; }
+    .mg-checklist {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+      gap: .35rem; margin: .35rem 0 .5rem; max-height: 16rem; overflow-y: auto;
+      padding: .5rem .65rem; border: 1px solid var(--border-input); border-radius: 8px;
+      background: var(--pref-inner-bg);
+    }
+    .mg-checklist label {
+      display: flex; align-items: flex-start; gap: .5rem; font-size: .85rem;
+      line-height: 1.35; cursor: pointer;
+    }
+    .mg-checklist code { font-family: ui-monospace, monospace; }
+    .mg-checklist .mg-meta { color: var(--muted); font-size: .78rem; }
+    .mg-danger { color: var(--down); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+  <header>
+    <div>
+      <h1>MAC groups</h1>
+      <div class="muted">Cluster multiple MAC addresses (e.g. randomized phone MACs) under one display name.</div>
+      <div class="muted" style="font-size:.88rem;margin-top:.35rem">Last sweep: {{ last_sweep }}</div>
+      <div class="navlinks">
+        <a href="{{ url_for('index') }}">Dashboard</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('preferences_page') }}">Preferences</a>
+      </div>
+    </div>
+    <div class="muted">Server time: {{ now }}</div>
+  </header>
+  <main>
+    {% if err %}
+    <p class="muted" style="color:var(--down);margin:0 0 1rem">{{ err }}</p>
+    {% endif %}
+    {% if saved %}
+    <p class="muted" style="margin:0 0 1rem">Saved.</p>
+    {% endif %}
+
+    {% for grp in groups %}
+    <section class="card mg-card">
+      <div class="row-top">
+        <div>
+          <div class="nick">{{ grp.nickname }}</div>
+          <div class="muted" style="font-size:.85rem;margin-top:.15rem">
+            {{ grp.members|length }} MAC{% if grp.members|length != 1 %}es{% endif %} grouped
+          </div>
+        </div>
+        <div>
+          <form method="post" action="{{ url_for('delete_mac_group_route', group_id=grp.id) }}"
+                onsubmit="return confirm('Delete this MAC group? Member MACs will revert to their per-row nicknames.');"
+                style="margin:0">
+            <button class="mg-danger" type="submit">Delete group</button>
+          </form>
+        </div>
+      </div>
+
+      <form class="inline" method="post" action="{{ url_for('rename_mac_group_route', group_id=grp.id) }}">
+        <input name="nickname" type="text" value="{{ grp.nickname }}" required />
+        <button type="submit">Rename</button>
+      </form>
+
+      {% if grp.members %}
+      <div class="mg-member-list">
+        {% for m in grp.members %}
+        <span class="mg-chip">
+          <code>{{ m.mac }}</code>
+          <span class="muted" style="font-size:.74rem">{{ m.label }}</span>
+          <form method="post" action="{{ url_for('remove_mac_from_group_route', group_id=grp.id) }}">
+            <input type="hidden" name="mac" value="{{ m.mac }}" />
+            <button type="submit" title="Remove from group" aria-label="Remove {{ m.mac }}">×</button>
+          </form>
+        </span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted" style="margin:.4rem 0 0;font-size:.85rem">No MACs in this group yet.</p>
+      {% endif %}
+
+      {% if grp.available %}
+      <form class="mg-form" method="post" action="{{ url_for('add_macs_to_group_route', group_id=grp.id) }}">
+        <div class="muted" style="font-size:.85rem">Add MACs to this group:</div>
+        <div class="mg-checklist">
+          {% for m in grp.available %}
+          <label>
+            <input type="checkbox" name="mac" value="{{ m.mac }}" />
+            <span>
+              <code>{{ m.mac }}</code><br/>
+              <span class="mg-meta">{{ m.label }}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        <div><button type="submit">Add selected</button></div>
+      </form>
+      {% endif %}
+    </section>
+    {% endfor %}
+
+    <section class="card mg-card">
+      <div class="nick">Create a new MAC group</div>
+      <p class="muted" style="margin:.25rem 0 .5rem;font-size:.85rem">
+        Pick the MACs to cluster together. Any MAC already in another group will be moved here.
+      </p>
+      <form class="mg-form" method="post" action="{{ url_for('create_mac_group_route') }}">
+        <div class="mg-row">
+          <input name="nickname" type="text" placeholder="Group nickname (e.g. John's iPhone)" required />
+        </div>
+        {% if all_macs %}
+        <div class="mg-checklist">
+          {% for m in all_macs %}
+          <label>
+            <input type="checkbox" name="mac" value="{{ m.mac }}" />
+            <span>
+              <code>{{ m.mac }}</code>
+              {% if m.in_group %}<span class="mg-meta"> (currently in: {{ m.in_group }})</span>{% endif %}
+              <br/>
+              <span class="mg-meta">{{ m.label }}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted" style="font-size:.85rem;margin:.25rem 0">No MACs have been observed yet — run a sweep first.</p>
+        {% endif %}
+        <div><button class="primary" type="submit">Create group</button></div>
+      </form>
+    </section>
   </main>
   <footer class="app-footer">
     Pinger v{{ version }} · Deployed: {{ deployed }}
@@ -1038,25 +1224,73 @@ def _build_hour_slots_for_day(
     return rows
 
 
-def _group_by_mac(rows: list[Any]) -> list[dict[str, Any]]:
+def _effective_nickname(
+    row: Any, mem_map: dict[str, dict[str, Any]]
+) -> str:
+    """Supergroup nickname if MAC is in one; else the per-row nickname."""
+    mac = (row["mac"] or "").strip().lower()
+    if mac and mac in mem_map:
+        nick = mem_map[mac]["nickname"].strip()
+        if nick:
+            return nick
+    return (row["nickname"] or "").strip()
+
+
+def _group_by_mac(
+    rows: list[Any], mem_map: dict[str, dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
+    """Group device rows by MAC supergroup → MAC → IP, in that order."""
+    mem_map = mem_map or {}
+    by_super: dict[int, list[Any]] = defaultdict(list)
     by_mac: dict[str, list[Any]] = defaultdict(list)
     singles_no_mac: list[Any] = []
     for row in rows:
         m = (row["mac"] or "").strip().lower()
-        if m:
+        if m and m in mem_map:
+            by_super[int(mem_map[m]["group_id"])].append(row)
+        elif m:
             by_mac[m].append(row)
         else:
             singles_no_mac.append(row)
+
     groups: list[dict[str, Any]] = []
+    for gid, rlist in by_super.items():
+        primary = max(rlist, key=lambda r: float(r["updated_at"]))
+        nick = mem_map[
+            (primary["mac"] or "").strip().lower()
+        ]["nickname"]
+        groups.append(
+            {
+                "rows": rlist,
+                "primary": primary,
+                "super_group_id": gid,
+                "super_nickname": nick,
+            }
+        )
     for _mk, rlist in by_mac.items():
         primary = max(rlist, key=lambda r: float(r["updated_at"]))
-        groups.append({"rows": rlist, "primary": primary})
+        groups.append(
+            {
+                "rows": rlist,
+                "primary": primary,
+                "super_group_id": None,
+                "super_nickname": None,
+            }
+        )
     for row in singles_no_mac:
-        groups.append({"rows": [row], "primary": row})
+        groups.append(
+            {
+                "rows": [row],
+                "primary": row,
+                "super_group_id": None,
+                "super_nickname": None,
+            }
+        )
 
     def sort_key(g: dict[str, Any]) -> tuple[str, str]:
         p = g["primary"]
-        return ((p["nickname"] or "").lower(), str(p["ip"]))
+        nick = (g["super_nickname"] or p["nickname"] or "").lower()
+        return (nick, str(p["ip"]))
 
     groups.sort(key=sort_key)
     return groups
@@ -1065,7 +1299,16 @@ def _group_by_mac(rows: list[Any]) -> list[dict[str, Any]]:
 def _uptime_group_captions(g: dict[str, Any]) -> tuple[str, str]:
     rows = g["rows"]
     primary = g["primary"]
-    nick = (primary["nickname"] or "").strip() or "Unnamed device"
+    super_nick = (g.get("super_nickname") or "").strip()
+    nick = super_nick or (primary["nickname"] or "").strip() or "Unnamed device"
+    macs = sorted({(r["mac"] or "").strip() for r in rows if (r["mac"] or "").strip()})
+    if super_nick and len(macs) > 1:
+        ips = sorted({str(r["ip"]) for r in rows}, key=lambda s: IPv4Address(s))
+        ip_join = ", ".join(ips)
+        mac_join = ", ".join(macs)
+        title = f"{nick} ({len(macs)} MACs grouped, {len(rows)} rows)"
+        meta = f"MACs {mac_join} · current IPs on file: {ip_join}"
+        return title, meta
     mac = (primary["mac"] or "").strip()
     if len(rows) == 1:
         ip = str(primary["ip"])
@@ -1089,8 +1332,31 @@ def _fmt_ts_local(ts: float | None) -> str:
     )
 
 
-def _device_select_label(row: Any) -> str:
-    nick = (row["nickname"] or "").strip() or "Unnamed"
+def _mac_labels(conn: Any) -> dict[str, str]:
+    """Lower-cased MAC -> short label of its most recently-updated device row."""
+    out: dict[str, tuple[float, str]] = {}
+    for row in dbm.list_devices(conn):
+        m = (row["mac"] or "").strip().lower()
+        if not m:
+            continue
+        nick = (row["nickname"] or "").strip() or "Unnamed"
+        ip = str(row["ip"])
+        ts = float(row["updated_at"])
+        label = f"{nick} @ {ip}"
+        if m not in out or ts > out[m][0]:
+            out[m] = (ts, label)
+    return {m: lbl for m, (_, lbl) in out.items()}
+
+
+def _device_select_label(
+    row: Any, mem_map: dict[str, dict[str, Any]] | None = None
+) -> str:
+    mem_map = mem_map or {}
+    mac_l = (row["mac"] or "").strip().lower()
+    super_nick = ""
+    if mac_l and mac_l in mem_map:
+        super_nick = mem_map[mac_l]["nickname"].strip()
+    nick = super_nick or (row["nickname"] or "").strip() or "Unnamed"
     mac = (row["mac"] or "").strip()
     ip = row["ip"]
     if mac:
@@ -1171,7 +1437,8 @@ def create_app(runner: object) -> Flask:
         bucket_sec = max(60, min(config.INTERVAL_SEC, 3600))
         since = now_ts - retention_sec
 
-        for grp in _group_by_mac(dbm.list_devices(c)):
+        mem_map = dbm.mac_group_membership_map(c)
+        for grp in _group_by_mac(dbm.list_devices(c), mem_map):
             rows = grp["rows"]
             primary = grp["primary"]
             ids = [int(r["id"]) for r in rows]
@@ -1187,13 +1454,22 @@ def create_app(runner: object) -> Flask:
             )
             if len(bars) > 400:
                 bars = bars[-400:]
+            macs = sorted(
+                {(r["mac"] or "").strip() for r in rows if (r["mac"] or "").strip()}
+            )
+            super_nick = (grp.get("super_nickname") or "").strip()
+            row_nick = (primary["nickname"] or "").strip()
             devices.append(
                 {
                     "id": int(primary["id"]),
                     "current_ip": p_ip,
                     "other_ips": other_ips,
                     "mac": primary["mac"],
-                    "nickname": (primary["nickname"] or "").strip() or None,
+                    "macs": macs,
+                    "nickname": super_nick or row_nick or None,
+                    "super_group_id": grp.get("super_group_id"),
+                    "super_nickname": super_nick or None,
+                    "row_nickname": row_nick or None,
                     "details": _fmt_details(primary["details_json"]),
                     "last": (
                         {
@@ -1279,9 +1555,13 @@ def create_app(runner: object) -> Flask:
             detail_day = None
 
         all_rows = dbm.list_devices(c)
+        mem_map = dbm.mac_group_membership_map(c)
         options = [
-            {"id": int(grp["primary"]["id"]), "label": _device_select_label(grp["primary"])}
-            for grp in _group_by_mac(all_rows)
+            {
+                "id": int(grp["primary"]["id"]),
+                "label": _device_select_label(grp["primary"], mem_map),
+            }
+            for grp in _group_by_mac(all_rows, mem_map)
         ]
 
         blocks: list[dict[str, Any]] = []
@@ -1349,7 +1629,21 @@ def create_app(runner: object) -> Flask:
             row_objs = [r for r in row_objs if r is not None]
             prim = max(row_objs, key=lambda r: float(r["updated_at"]))
             logs_any = dbm.fetch_logs_for_devices(c, gid_list, since)
-            title, meta = _uptime_group_captions({"rows": row_objs, "primary": prim})
+            mac_l = (prim["mac"] or "").strip().lower()
+            super_nick = (
+                mem_map[mac_l]["nickname"] if mac_l and mac_l in mem_map else None
+            )
+            super_gid = (
+                int(mem_map[mac_l]["group_id"]) if mac_l and mac_l in mem_map else None
+            )
+            title, meta = _uptime_group_captions(
+                {
+                    "rows": row_objs,
+                    "primary": prim,
+                    "super_group_id": super_gid,
+                    "super_nickname": super_nick,
+                }
+            )
             add_block_from_ids(
                 title,
                 meta,
@@ -1359,7 +1653,7 @@ def create_app(runner: object) -> Flask:
                 no_rows_in_retention=len(logs_any) == 0,
             )
         else:
-            for gx, grp in enumerate(_group_by_mac(all_rows)):
+            for gx, grp in enumerate(_group_by_mac(all_rows, mem_map)):
                 ids_list = [int(r["id"]) for r in grp["rows"]]
                 logs_any = dbm.fetch_logs_for_devices(c, ids_list, since)
                 title, meta = _uptime_group_captions(grp)
@@ -1579,5 +1873,134 @@ def create_app(runner: object) -> Flask:
             "points": points,
         }
         return jsonify(payload)
+
+    def _mac_groups_context() -> dict[str, Any]:
+        c = g.db
+        labels = _mac_labels(c)
+        mem_map = dbm.mac_group_membership_map(c)
+        all_macs_known = dbm.known_macs(c)
+
+        gid_to_name: dict[int, str] = {}
+        groups_raw = dbm.list_mac_groups(c)
+        for grp in groups_raw:
+            gid_to_name[int(grp["id"])] = str(grp["nickname"])
+
+        groups: list[dict[str, Any]] = []
+        for grp in groups_raw:
+            gid = int(grp["id"])
+            members = [
+                {"mac": m, "label": labels.get(m, "(not seen yet)")}
+                for m in grp["members"]
+            ]
+            members.sort(key=lambda x: x["mac"])
+            member_set = {m["mac"] for m in members}
+            available: list[dict[str, str]] = []
+            for m in all_macs_known:
+                if m in member_set:
+                    continue
+                lbl = labels.get(m, "(unknown)")
+                if m in mem_map and int(mem_map[m]["group_id"]) != gid:
+                    other = gid_to_name.get(int(mem_map[m]["group_id"]), "?")
+                    lbl = f"{lbl} — currently in {other!r}"
+                available.append({"mac": m, "label": lbl})
+            groups.append(
+                {
+                    "id": gid,
+                    "nickname": grp["nickname"],
+                    "members": members,
+                    "available": available,
+                }
+            )
+
+        all_macs: list[dict[str, Any]] = []
+        for m in all_macs_known:
+            other = ""
+            if m in mem_map:
+                other = gid_to_name.get(int(mem_map[m]["group_id"]), "")
+            all_macs.append(
+                {
+                    "mac": m,
+                    "label": labels.get(m, "(unknown)"),
+                    "in_group": other or None,
+                }
+            )
+
+        return {"groups": groups, "all_macs": all_macs}
+
+    @app.get("/mac-groups")
+    def mac_groups_page():
+        c = g.db
+        ctx = _mac_groups_context()
+        return render_template_string(
+            MAC_GROUPS_HTML,
+            network=network_label(),
+            retention=config.RETENTION_DAYS,
+            last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
+            now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
+            saved=request.args.get("saved") == "1",
+            err=(request.args.get("err") or "").strip() or None,
+            version=PINGER_VERSION,
+            deployed=_fmt_ts_local(DEPLOY_TS) if DEPLOY_TS > 0 else "unknown",
+            **ctx,
+        )
+
+    @app.post("/mac-groups/create")
+    def create_mac_group_route():
+        c = g.db
+        nick = (request.form.get("nickname") or "").strip()
+        if not nick:
+            return redirect(url_for("mac_groups_page", err="Group name is required."))
+        macs = [
+            m.strip().lower()
+            for m in request.form.getlist("mac")
+            if m and m.strip()
+        ]
+        try:
+            with dbm.transaction(c):
+                gid = dbm.create_mac_group(c, nick)
+                for m in macs:
+                    dbm.add_mac_to_group(c, gid, m)
+        except ValueError as exc:
+            return redirect(url_for("mac_groups_page", err=str(exc)))
+        return redirect(url_for("mac_groups_page", saved="1"))
+
+    @app.post("/mac-groups/<int:group_id>/rename")
+    def rename_mac_group_route(group_id: int):
+        c = g.db
+        nick = (request.form.get("nickname") or "").strip()
+        if not nick:
+            return redirect(url_for("mac_groups_page", err="Group name is required."))
+        try:
+            dbm.rename_mac_group(c, group_id, nick)
+        except ValueError as exc:
+            return redirect(url_for("mac_groups_page", err=str(exc)))
+        return redirect(url_for("mac_groups_page", saved="1"))
+
+    @app.post("/mac-groups/<int:group_id>/delete")
+    def delete_mac_group_route(group_id: int):
+        c = g.db
+        dbm.delete_mac_group(c, group_id)
+        return redirect(url_for("mac_groups_page", saved="1"))
+
+    @app.post("/mac-groups/<int:group_id>/members/add")
+    def add_macs_to_group_route(group_id: int):
+        c = g.db
+        macs = [
+            m.strip().lower()
+            for m in request.form.getlist("mac")
+            if m and m.strip()
+        ]
+        with dbm.transaction(c):
+            for m in macs:
+                dbm.add_mac_to_group(c, group_id, m)
+        return redirect(url_for("mac_groups_page", saved="1"))
+
+    @app.post("/mac-groups/<int:group_id>/members/remove")
+    def remove_mac_from_group_route(group_id: int):
+        c = g.db
+        mac = (request.form.get("mac") or "").strip().lower()
+        if mac:
+            dbm.remove_mac_from_group(c, group_id, mac)
+        return redirect(url_for("mac_groups_page", saved="1"))
 
     return app

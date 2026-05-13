@@ -136,6 +136,11 @@ class SweepRunner:
             for ip_a, mac_a, did, lat in new_device_alerts:
                 row = dbm.get_device_by_id(conn, did)
                 nick = (row["nickname"] or "").strip() if row else ""
+                grp = dbm.mac_group_for_mac(conn, mac_a)
+                if grp is not None:
+                    super_nick = str(grp["nickname"]).strip()
+                    if super_nick:
+                        nick = super_nick
                 try:
                     mailer.send_new_device_alert(
                         to_addr,

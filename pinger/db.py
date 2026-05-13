@@ -63,6 +63,23 @@ def init_schema(conn: sqlite3.Connection) -> None:
             key TEXT PRIMARY KEY NOT NULL,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS mac_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nickname TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS mac_group_members (
+            group_id INTEGER NOT NULL,
+            mac TEXT NOT NULL,
+            PRIMARY KEY (group_id, mac),
+            FOREIGN KEY (group_id) REFERENCES mac_groups(id) ON DELETE CASCADE
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_mac_group_members_mac
+            ON mac_group_members(mac);
         """
     )
 
@@ -162,16 +179,160 @@ def update_nickname(conn: sqlite3.Connection, device_id: int, nickname: str) -> 
     )
 
 
+def _normalize_mac(mac: str | None) -> str:
+    return (mac or "").strip().lower()
+
+
+def mac_group_for_mac(
+    conn: sqlite3.Connection, mac: str | None
+) -> sqlite3.Row | None:
+    m = _normalize_mac(mac)
+    if not m:
+        return None
+    return conn.execute(
+        "SELECT g.id, g.nickname "
+        "FROM mac_groups g JOIN mac_group_members m ON m.group_id = g.id "
+        "WHERE LOWER(TRIM(m.mac)) = ? LIMIT 1",
+        (m,),
+    ).fetchone()
+
+
+def list_mac_group_members(
+    conn: sqlite3.Connection, group_id: int
+) -> list[str]:
+    return [
+        str(r["mac"])
+        for r in conn.execute(
+            "SELECT mac FROM mac_group_members WHERE group_id = ? ORDER BY mac",
+            (group_id,),
+        )
+    ]
+
+
+def list_mac_groups(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Groups with their member MACs (sorted)."""
+    out: list[dict[str, Any]] = []
+    for grow in conn.execute(
+        "SELECT id, nickname FROM mac_groups ORDER BY LOWER(nickname), id"
+    ).fetchall():
+        out.append(
+            {
+                "id": int(grow["id"]),
+                "nickname": str(grow["nickname"]),
+                "members": list_mac_group_members(conn, int(grow["id"])),
+            }
+        )
+    return out
+
+
+def mac_group_membership_map(
+    conn: sqlite3.Connection,
+) -> dict[str, dict[str, Any]]:
+    """MAC (lowercased) -> {'group_id': int, 'nickname': str}."""
+    out: dict[str, dict[str, Any]] = {}
+    for r in conn.execute(
+        "SELECT LOWER(TRIM(m.mac)) AS mac, g.id AS gid, g.nickname AS nick "
+        "FROM mac_group_members m JOIN mac_groups g ON g.id = m.group_id"
+    ).fetchall():
+        out[str(r["mac"])] = {"group_id": int(r["gid"]), "nickname": str(r["nick"])}
+    return out
+
+
+def create_mac_group(conn: sqlite3.Connection, nickname: str) -> int:
+    name = (nickname or "").strip()
+    if not name:
+        raise ValueError("mac group nickname is required")
+    t = now()
+    cur = conn.execute(
+        "INSERT INTO mac_groups (nickname, created_at, updated_at) VALUES (?, ?, ?)",
+        (name, t, t),
+    )
+    return int(cur.lastrowid)
+
+
+def rename_mac_group(
+    conn: sqlite3.Connection, group_id: int, nickname: str
+) -> None:
+    name = (nickname or "").strip()
+    if not name:
+        raise ValueError("mac group nickname is required")
+    conn.execute(
+        "UPDATE mac_groups SET nickname = ?, updated_at = ? WHERE id = ?",
+        (name, now(), group_id),
+    )
+
+
+def delete_mac_group(conn: sqlite3.Connection, group_id: int) -> None:
+    conn.execute("DELETE FROM mac_groups WHERE id = ?", (group_id,))
+
+
+def add_mac_to_group(
+    conn: sqlite3.Connection, group_id: int, mac: str
+) -> None:
+    m = _normalize_mac(mac)
+    if not m:
+        return
+    conn.execute(
+        "DELETE FROM mac_group_members WHERE LOWER(TRIM(mac)) = ?", (m,)
+    )
+    conn.execute(
+        "INSERT INTO mac_group_members (group_id, mac) VALUES (?, ?)",
+        (group_id, m),
+    )
+    conn.execute(
+        "UPDATE mac_groups SET updated_at = ? WHERE id = ?", (now(), group_id)
+    )
+
+
+def remove_mac_from_group(
+    conn: sqlite3.Connection, group_id: int, mac: str
+) -> None:
+    m = _normalize_mac(mac)
+    if not m:
+        return
+    conn.execute(
+        "DELETE FROM mac_group_members WHERE group_id = ? AND LOWER(TRIM(mac)) = ?",
+        (group_id, m),
+    )
+    conn.execute(
+        "UPDATE mac_groups SET updated_at = ? WHERE id = ?", (now(), group_id)
+    )
+
+
+def known_macs(conn: sqlite3.Connection) -> list[str]:
+    """Distinct non-empty MACs (lowercased) seen on devices, sorted."""
+    seen: set[str] = set()
+    for r in conn.execute("SELECT mac FROM devices WHERE mac IS NOT NULL"):
+        m = _normalize_mac(r["mac"])
+        if m:
+            seen.add(m)
+    return sorted(seen)
+
+
 def expand_device_group_ids(
     conn: sqlite3.Connection, device_id: int
 ) -> list[int]:
-    """All device rows sharing the same MAC as device_id; else [device_id] only."""
+    """All device rows in the same MAC supergroup (or MAC) as device_id."""
     row = get_device_by_id(conn, device_id)
     if not row:
         return [device_id]
-    mac = (row["mac"] or "").strip().lower()
+    mac = _normalize_mac(row["mac"])
     if not mac:
         return [device_id]
+    grp = mac_group_for_mac(conn, mac)
+    if grp is not None:
+        macs = list_mac_group_members(conn, int(grp["id"]))
+        if macs:
+            placeholders = ",".join("?" * len(macs))
+            out = [
+                int(r["id"])
+                for r in conn.execute(
+                    f"SELECT id FROM devices WHERE LOWER(TRIM(mac)) IN ({placeholders}) "
+                    "ORDER BY id",
+                    tuple(macs),
+                )
+            ]
+            return out or [device_id]
     out = [
         int(r["id"])
         for r in conn.execute(
