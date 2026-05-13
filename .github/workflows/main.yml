@@ -16,7 +16,7 @@ jobs:
       - name: Update Service
         run: |
           # copy the code to the service location
-          sudo cp -a /home/woodhouses/actions-runner/_work/pinger/. /opt/pinger/ 
+          sudo cp -a /home/woodhouses/actions-runner/_work/pinger/pinger/. /opt/pinger/ 
           # copy over the service file
           sudo cp /opt/pinger/systemd/pinger.service /etc/systemd/system/pinger.service
 
