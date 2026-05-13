@@ -48,3 +48,4 @@ SMTP_PASSWORD = os.environ.get("PINGER_SMTP_PASSWORD", "").strip()
 SMTP_FROM = os.environ.get("PINGER_SMTP_FROM", "").strip()
 _raw_tls = (os.environ.get("PINGER_SMTP_USE_TLS", "1") or "").strip().lower()
 SMTP_USE_TLS = _raw_tls not in ("0", "false", "no", "off")
+SMTP_LOCAL_HOSTNAME = os.environ.get("PINGER_SMTP_LOCAL_HOSTNAME", "").strip() or None

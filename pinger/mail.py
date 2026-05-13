@@ -24,6 +24,29 @@ class SMTPParams:
     use_tls: bool
 
 
+def _smtp_local_hostname() -> str | None:
+    return config.SMTP_LOCAL_HOSTNAME
+
+
+def _auth_user(smtp: SMTPParams) -> str:
+    """Username for SMTP AUTH. Gmail needs the full address; we fall back to From if set."""
+    u = (smtp.user or "").strip()
+    if u:
+        return u
+    if (smtp.password or "").strip() and "@" in (smtp.from_addr or ""):
+        return smtp.from_addr.strip()
+    return ""
+
+
+def _use_starttls(smtp: SMTPParams) -> bool:
+    """STARTTLS is required on standard submission ports (Gmail, etc.)."""
+    if smtp.port == 465:
+        return False
+    if smtp.port in (587, 2525):
+        return True
+    return smtp.use_tls
+
+
 def load_smtp_params() -> SMTPParams | None:
     """Resolve SMTP from DB overrides, then environment. Returns None if no host is configured."""
     from pinger import db as dbm
@@ -98,22 +121,44 @@ def smtp_configured() -> bool:
 
 def _deliver_email(msg: EmailMessage, smtp: SMTPParams) -> None:
     host = smtp.host
-    if smtp.port == 465:
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(host, smtp.port, context=context) as server:
-            if smtp.user:
-                server.login(smtp.user, smtp.password)
-            server.send_message(msg)
-    else:
-        with smtplib.SMTP(host, smtp.port, timeout=30) as server:
-            server.ehlo()
-            if smtp.use_tls:
-                context = ssl.create_default_context()
-                server.starttls(context=context)
+    local = _smtp_local_hostname()
+    auth_user = _auth_user(smtp)
+    pw = smtp.password or ""
+
+    try:
+        if smtp.port == 465:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(
+                host, smtp.port, context=context, local_hostname=local
+            ) as server:
+                if auth_user and pw:
+                    server.login(auth_user, pw)
+                elif pw and not auth_user:
+                    raise RuntimeError(
+                        "SMTP password is set but username is empty — "
+                        "use your full Gmail address as the username (or set From to that address)."
+                    )
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(
+                host, smtp.port, timeout=30, local_hostname=local
+            ) as server:
                 server.ehlo()
-            if smtp.user:
-                server.login(smtp.user, smtp.password)
-            server.send_message(msg)
+                if _use_starttls(smtp):
+                    context = ssl.create_default_context()
+                    server.starttls(context=context)
+                    server.ehlo()
+                if auth_user and pw:
+                    server.login(auth_user, pw)
+                elif pw and not auth_user:
+                    raise RuntimeError(
+                        "SMTP password is set but username is empty — "
+                        "use your full Gmail address as the username (or set From to that address)."
+                    )
+                server.send_message(msg)
+    except smtplib.SMTPException as exc:
+        log.warning("SMTP error to %s:%s: %s", host, smtp.port, exc)
+        raise
 
 
 def send_new_device_alert(

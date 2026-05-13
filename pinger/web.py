@@ -537,6 +537,9 @@ PREFERENCES_HTML = (
         <p class="muted settings-hint" style="margin-top:0;margin-bottom:.55rem">
           Values here override the service environment (e.g. <code>PINGER_SMTP_*</code>). Leave a field empty to use the server default. A password stored in the database is kept in plain text — prefer environment variables for production secrets.
         </p>
+        <p class="muted smtp-pass-note" style="margin-bottom:.75rem;line-height:1.45">
+          <strong>Gmail:</strong> host <code>smtp.gmail.com</code>, port <code>587</code> with TLS <strong>On</strong> (or port <code>465</code> — implicit SSL). Username must be your <strong>full Gmail address</strong>. With 2-Step Verification, create an <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener noreferrer">App password</a> and paste it here — not your normal Google password. If it still fails, check the Pinger log for the SMTP error line after a test send.
+        </p>
 
         <div class="smtp-grid" role="group" aria-labelledby="smtp-heading">
           <div>
