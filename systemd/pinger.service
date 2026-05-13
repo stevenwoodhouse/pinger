@@ -21,6 +21,13 @@ Environment=PINGER_PORT=8765
 Environment=PINGER_INTERVAL_SEC=1800
 # Auto-detect private IPv4 LAN; set explicitly if needed, e.g. 192.168.1.0/24
 # Environment=PINGER_NETWORK_CIDR=192.168.1.0/24
+# New-device email alerts (recipient is set in the web UI). Example relay:
+# Environment=PINGER_SMTP_HOST=smtp.example.com
+# Environment=PINGER_SMTP_PORT=587
+# Environment=PINGER_SMTP_FROM=pinger@example.com
+# Environment=PINGER_SMTP_USER=
+# Environment=PINGER_SMTP_PASSWORD=
+# Environment=PINGER_SMTP_USE_TLS=1
 # User= must EXECUTE python and traverse every directory in the path. If logs say
 # "Failed to execute /opt/pinger/venv/bin/python: Permission denied":
 #   sudo namei -l /opt/pinger/venv/bin/python

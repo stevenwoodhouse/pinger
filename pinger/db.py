@@ -58,6 +58,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
             key TEXT PRIMARY KEY NOT NULL,
             value REAL NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS pinger_settings (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
         """
     )
 
@@ -96,18 +101,35 @@ def get_last_sweep_finished(conn: sqlite3.Connection) -> float | None:
     return None if v <= 0 else v
 
 
-def get_or_create_device(conn: sqlite3.Connection, ip: str) -> int:
+def get_setting(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute(
+        "SELECT value FROM pinger_settings WHERE key = ?", (key,)
+    ).fetchone()
+    if not row:
+        return None
+    return str(row["value"])
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO pinger_settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+
+
+def get_or_create_device(conn: sqlite3.Connection, ip: str) -> tuple[int, bool]:
     ip = str(ipaddress.IPv4Address(ip))
     row = conn.execute("SELECT id FROM devices WHERE ip = ?", (ip,)).fetchone()
     if row:
-        return int(row["id"])
+        return int(row["id"]), False
     t = now()
     cur = conn.execute(
         "INSERT INTO devices (ip, nickname, mac, details_json, created_at, updated_at) "
         "VALUES (?, NULL, NULL, NULL, ?, ?)",
         (ip, t, t),
     )
-    return int(cur.lastrowid)
+    return int(cur.lastrowid), True
 
 
 def touch_device(

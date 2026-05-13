@@ -11,6 +11,7 @@ from ipaddress import IPv4Address
 
 from pinger import config
 from pinger import db as dbm
+from pinger import mail as mailer
 from pinger.discovery import get_scan_network, iter_host_addresses, read_arp_table
 from pinger.icmp import ping_many
 
@@ -63,6 +64,8 @@ class SweepRunner:
         )
 
         arp = read_arp_table()
+        had_prior_sweep = dbm.get_last_sweep_finished(conn) is not None
+        new_device_alerts: list[tuple[str, str | None, int, float | None]] = []
 
         with dbm.transaction(conn):
             retention = float(config.RETENTION_DAYS) * 86400.0
@@ -79,8 +82,12 @@ class SweepRunner:
                 tracked = row is not None
 
                 if o.reachable:
-                    device_id = dbm.get_or_create_device(conn, o.ip)
+                    device_id, created = dbm.get_or_create_device(conn, o.ip)
                     mac = arp.get(o.ip)
+                    if created and had_prior_sweep:
+                        new_device_alerts.append(
+                            (o.ip, mac, device_id, o.latency_ms)
+                        )
                     dbm.touch_device(conn, device_id, mac=mac)
                     dbm.update_details(
                         conn, device_id, _ping_details(o.stdout, o.latency_ms)
@@ -122,3 +129,27 @@ class SweepRunner:
 
             dbm.sync_nicknames_for_shared_macs(conn)
             dbm.set_last_sweep_finished(conn, dbm.now())
+
+        to_addr = (dbm.get_setting(conn, "notify_email") or "").strip()
+        if new_device_alerts and to_addr and config.SMTP_HOST:
+            net_label = str(net)
+            for ip_a, mac_a, did, lat in new_device_alerts:
+                try:
+                    mailer.send_new_device_alert(
+                        to_addr,
+                        ip=ip_a,
+                        mac=mac_a,
+                        device_id=did,
+                        latency_ms=lat,
+                        network=net_label,
+                    )
+                except Exception:
+                    log.exception(
+                        "Failed to send new-device alert for ip=%s", ip_a
+                    )
+        elif new_device_alerts and to_addr and not config.SMTP_HOST:
+            log.warning(
+                "notify_email is set but PINGER_SMTP_HOST is empty; "
+                "skipping %d new-device alert(s)",
+                len(new_device_alerts),
+            )

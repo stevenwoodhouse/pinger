@@ -151,6 +151,13 @@ STYLES_CORE = r"""
     .spark i.unk { background: #2c3548; }
     form.inline { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; min-width: 0; }
     form.inline input[type=text] { flex: 1 1 8rem; min-width: 0; }
+    form.notify-form { display: flex; flex-wrap: wrap; gap: .5rem .65rem; align-items: center; margin-top: .85rem;
+      padding: .75rem .85rem; background: var(--panel); border: 1px solid #2c3d5c; border-radius: 10px; max-width: 100%; }
+    form.notify-form label { color: var(--muted); font-size: .88rem; }
+    form.notify-form input[type=email] {
+      background: #141c2a; border: 1px solid #2c3d5c; color: var(--text);
+      padding: .45rem .65rem; border-radius: 8px; font: inherit; flex: 1 1 14rem; min-width: 0;
+    }
     @media (max-width: 22rem) {
       form.inline { flex-direction: column; align-items: stretch; }
       form.inline button { width: 100%; }
@@ -270,6 +277,21 @@ INDEX_HTML = (
         <button type="submit">Add / watch</button>
       </form>
     </div>
+    <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-form">
+      <label for="notify-email">Email for new-device alerts</label>
+      <input id="notify-email" name="notify_email" type="email" inputmode="email" autocomplete="email"
+        value="{{ notify_email }}" placeholder="Leave empty to disable" />
+      <button type="submit">Save</button>
+    </form>
+    {% if notify_saved %}
+    <p class="muted" style="margin:.45rem 0 0;font-size:.85rem">Alert address saved.</p>
+    {% elif notify_err %}
+    <p class="muted" style="margin:.45rem 0 0;font-size:.85rem;color:var(--down)">Could not save that address (check the format).</p>
+    {% endif %}
+    <p class="muted" style="margin:.35rem 0 0;font-size:.78rem;line-height:1.4">
+      After at least one sweep has finished, Pinger emails this address when a host responds that was not previously in the database (new IP on the LAN).
+      Outbound mail needs SMTP on the server — set <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> (and optional <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_PORT</code>, credentials, <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_FROM</code>) in the service environment.
+    </p>
     <div class="grid">
       {% for d in devices %}
       <div class="card">
@@ -839,6 +861,9 @@ def create_app(runner: object) -> Flask:
             last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
             now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
             sweep_started=request.args.get("sweep") == "1",
+            notify_email=(dbm.get_setting(c, "notify_email") or ""),
+            notify_saved=request.args.get("notify") == "1",
+            notify_err=request.args.get("notify") == "0",
         )
 
     @app.get("/uptime")
@@ -1015,12 +1040,24 @@ def create_app(runner: object) -> Flask:
             return redirect(url_for("index"))
         c = g.db
         try:
-            did = dbm.get_or_create_device(c, ip)
+            did, _created = dbm.get_or_create_device(c, ip)
             if nick:
                 dbm.update_nickname(c, did, nick)
         except Exception as exc:  # noqa: BLE001
             return (f"Invalid IP: {exc}", 400)
         return redirect(url_for("index"))
+
+    @app.post("/settings/notify-email")
+    def save_notify_email():
+        raw = (request.form.get("notify_email") or "").strip()
+        c = g.db
+        if not raw:
+            dbm.set_setting(c, "notify_email", "")
+            return redirect(url_for("index", notify="1"))
+        if "@" not in raw or len(raw) > 254:
+            return redirect(url_for("index", notify="0"))
+        dbm.set_setting(c, "notify_email", raw)
+        return redirect(url_for("index", notify="1"))
 
     @app.get("/api/status")
     def api_status():

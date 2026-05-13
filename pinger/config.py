@@ -39,3 +39,12 @@ PING_DEADLINE_SEC = _int("PINGER_PING_DEADLINE_SEC", 2)
 
 # Empty = locate `ping` on PATH (/usr/bin/ping, etc.). Systemd units often omit PATH otherwise.
 PING_EXECUTABLE = os.environ.get("PINGER_PING_EXECUTABLE", "").strip()
+
+# New-device email alerts (recipient is stored in SQLite via the web UI).
+SMTP_HOST = os.environ.get("PINGER_SMTP_HOST", "").strip()
+SMTP_PORT = _int("PINGER_SMTP_PORT", 587)
+SMTP_USER = os.environ.get("PINGER_SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("PINGER_SMTP_PASSWORD", "").strip()
+SMTP_FROM = os.environ.get("PINGER_SMTP_FROM", "").strip()
+_raw_tls = (os.environ.get("PINGER_SMTP_USE_TLS", "1") or "").strip().lower()
+SMTP_USE_TLS = _raw_tls not in ("0", "false", "no", "off")
