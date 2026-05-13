@@ -151,16 +151,55 @@ STYLES_CORE = r"""
     .spark i.unk { background: #2c3548; }
     form.inline { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; min-width: 0; }
     form.inline input[type=text] { flex: 1 1 8rem; min-width: 0; }
-    form.notify-toolbar {
-      display: flex; flex-wrap: wrap; gap: .45rem .55rem; align-items: center; margin: 0;
-      flex: 1 1 18rem; min-width: min(100%, 12rem); max-width: 100%;
-      padding: .5rem .65rem; border: 1px solid #3f5e8a; border-radius: 10px;
-      background: linear-gradient(160deg, #1e2d45 0%, #1a2535 100%);
+    .dash-settings {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0 clamp(0.75rem, 3vw, 1.25rem) 1rem;
     }
-    form.notify-toolbar .notify-lab {
-      font-size: .82rem; font-weight: 600; color: var(--text); letter-spacing: .02em;
+    .dash-settings-inner {
+      border: 2px solid var(--accent);
+      border-radius: 12px;
+      padding: 1rem 1.05rem 0.95rem;
+      background: #152238;
+      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+      max-width: 100%;
     }
-    form.notify-toolbar input[type=email] { flex: 1 1 11rem; min-width: 0; }
+    .settings-heading {
+      margin: 0 0 0.65rem 0;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    form.notify-dash-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem 0.65rem;
+      align-items: flex-end;
+      margin: 0 0 0.55rem 0;
+    }
+    form.notify-dash-form .notify-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex: 1 1 16rem;
+      min-width: 0;
+    }
+    form.notify-dash-form .notify-field label {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    form.notify-dash-form input[type=text] {
+      width: 100%;
+      font-size: 1rem;
+      min-height: 2.35rem;
+    }
+    .settings-hint {
+      margin: 0.35rem 0 0 0;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
     @media (max-width: 22rem) {
       form.inline { flex-direction: column; align-items: stretch; }
       form.inline button { width: 100%; }
@@ -263,6 +302,29 @@ INDEX_HTML = (
     </div>
       <div class="muted">Server time: {{ now }}</div>
   </header>
+  <section class="dash-settings" aria-labelledby="email-alerts-heading">
+    <!-- pinger-notify-settings -->
+    <div class="dash-settings-inner">
+      <h2 class="settings-heading" id="email-alerts-heading">New-device email alerts</h2>
+      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-dash-form">
+        <div class="notify-field">
+          <label for="notify-email">Send alerts to this address</label>
+          <input id="notify-email" name="notify_email" type="text" inputmode="email" autocomplete="email"
+            value="{{ notify_email }}" placeholder="you@example.com — leave empty to turn off" />
+        </div>
+        <button type="submit">Save</button>
+      </form>
+      {% if notify_saved %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem">Saved.</p>
+      {% elif notify_err %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">That does not look like a valid email (needs @).</p>
+      {% endif %}
+      <p class="muted settings-hint">
+        After the first sweep has completed, Pinger emails you when a new IP responds on the LAN.
+        The server also needs outbound SMTP: set <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_HOST</code> and usually <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_FROM</code> in the service environment (see unit file comments).
+      </p>
+    </div>
+  </section>
   <main>
     {% if sweep_started %}
     <p class="muted" style="margin:0 0 1rem 0;">
@@ -279,23 +341,7 @@ INDEX_HTML = (
         <input name="nickname" type="text" placeholder="Optional nickname" />
         <button type="submit">Add / watch</button>
       </form>
-      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-toolbar">
-        <span class="notify-lab" id="notify-email-label">Alert email</span>
-        <input id="notify-email" name="notify_email" type="email" inputmode="email" autocomplete="email"
-          aria-labelledby="notify-email-label"
-          value="{{ notify_email }}" placeholder="New-device notifications" />
-        <button type="submit">Save</button>
-      </form>
     </div>
-    {% if notify_saved %}
-    <p class="muted" style="margin:.45rem 0 0;font-size:.85rem">Alert address saved.</p>
-    {% elif notify_err %}
-    <p class="muted" style="margin:.45rem 0 0;font-size:.85rem;color:var(--down)">Could not save that address (check the format).</p>
-    {% endif %}
-    <p class="muted" style="margin:.35rem 0 0;font-size:.78rem;line-height:1.4">
-      After at least one sweep has finished, Pinger emails this address when a host responds that was not previously in the database (new IP on the LAN).
-      Outbound mail needs SMTP on the server — set <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> (and optional <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_PORT</code>, credentials, <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_FROM</code>) in the service environment.
-    </p>
     <div class="grid">
       {% for d in devices %}
       <div class="card">
