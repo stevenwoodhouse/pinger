@@ -72,7 +72,7 @@ STYLES_CORE = r"""
       align-items: center; margin-bottom: 1rem;
       min-width: 0;
     }
-    button, input[type=text], input[type=email] {
+    button, input[type=text], input[type=email], input[type=password] {
       background: var(--panel); border: 1px solid #2c3d5c;
       color: var(--text); padding: .45rem .7rem; border-radius: 8px;
       font: inherit;
@@ -172,30 +172,68 @@ STYLES_CORE = r"""
       color: var(--text);
       letter-spacing: 0.02em;
     }
-    form.notify-dash-form {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.55rem 0.65rem;
-      align-items: flex-end;
-      margin: 0 0 0.55rem 0;
-    }
-    form.notify-dash-form .notify-field {
+    .email-prefs-form .notify-field {
       display: flex;
       flex-direction: column;
       gap: 0.35rem;
-      flex: 1 1 16rem;
-      min-width: 0;
+      max-width: 36rem;
+      margin: 0 0 0.75rem 0;
     }
-    form.notify-dash-form .notify-field label {
+    .email-prefs-form .notify-field label {
       font-size: 0.88rem;
       font-weight: 600;
       color: var(--text);
     }
-    form.notify-dash-form input[type=text] {
+    .email-prefs-form .notify-field input[type=text] {
       width: 100%;
       font-size: 1rem;
       min-height: 2.35rem;
     }
+    .settings-sub {
+      margin: 1rem 0 0.35rem 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    .smtp-summary {
+      margin: 0 0 0.65rem 0;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .smtp-grid {
+      display: grid;
+      gap: 0.65rem;
+      max-width: 36rem;
+      margin: 0.35rem 0 0.75rem 0;
+    }
+    .smtp-grid label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .smtp-grid input[type=text],
+    .smtp-grid input[type=password],
+    .smtp-grid select {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 2.35rem;
+    }
+    .smtp-grid select {
+      background: var(--panel);
+      border: 1px solid #2c3d5c;
+      color: var(--text);
+      padding: 0.45rem 0.7rem;
+      border-radius: 8px;
+      font: inherit;
+    }
+    .smtp-pass-note { font-size: 0.78rem; color: var(--muted); margin: 0.15rem 0 0 0; }
+    .smtp-clear-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin: 0.15rem 0 0 0; }
+    .smtp-clear-row input { width: auto; min-height: auto; }
+    .email-prefs-form .settings-save-row { margin-top: 0.35rem; }
     .settings-hint {
       margin: 0.35rem 0 0 0;
       font-size: 0.82rem;
@@ -405,19 +443,70 @@ PREFERENCES_HTML = (
   </header>
   <main>
     <div class="dash-settings-inner" style="max-width:100%;box-sizing:border-box;">
-      <h2 class="settings-heading" id="email-alerts-heading">New-device email alerts</h2>
-      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-dash-form">
+      <h2 class="settings-heading" id="email-alerts-heading">Email &amp; alerts</h2>
+      <form method="post" action="{{ url_for('save_email_settings') }}" class="email-prefs-form">
         <div class="notify-field">
-          <label for="notify-email">Send alerts to this address</label>
+          <label for="notify-email">Send new-device alerts to</label>
           <input id="notify-email" name="notify_email" type="text" inputmode="email" autocomplete="email"
             value="{{ notify_email }}" placeholder="you@example.com — leave empty to turn off" />
         </div>
-        <button type="submit">Save</button>
+
+        <h3 class="settings-sub" id="smtp-heading">SMTP sender (optional)</h3>
+        <p class="muted smtp-summary">Effective: {{ smtp_summary }}</p>
+        <p class="muted settings-hint" style="margin-top:0;margin-bottom:.55rem">
+          Values here override the service environment (e.g. <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_*</code>). Leave a field empty to use the server default. A password stored in the database is kept in plain text — prefer environment variables for production secrets.
+        </p>
+
+        <div class="smtp-grid" role="group" aria-labelledby="smtp-heading">
+          <div>
+            <label for="smtp-host">SMTP host</label>
+            <input id="smtp-host" name="smtp_host" type="text" value="{{ smtp_host_override }}"
+              placeholder="e.g. smtp.example.com" autocomplete="off" />
+          </div>
+          <div>
+            <label for="smtp-port">Port</label>
+            <input id="smtp-port" name="smtp_port" type="text" value="{{ smtp_port_override }}"
+              placeholder="587 if empty" inputmode="numeric" autocomplete="off" />
+          </div>
+          <div>
+            <label for="smtp-from">From address</label>
+            <input id="smtp-from" name="smtp_from" type="text" value="{{ smtp_from_override }}"
+              placeholder="pinger@yourdomain.com" autocomplete="off" />
+          </div>
+          <div>
+            <label for="smtp-user">SMTP username</label>
+            <input id="smtp-user" name="smtp_user" type="text" value="{{ smtp_user_override }}" autocomplete="username" />
+          </div>
+          <div>
+            <label for="smtp-password">SMTP password</label>
+            <input id="smtp-password" name="smtp_password" type="password" value="" autocomplete="new-password" />
+            <p class="smtp-pass-note">{% if smtp_has_stored_password %}A password is saved. Enter a new value to replace it.{% else %}Leave blank to use the server environment password, if any.{% endif %}</p>
+            <div class="smtp-clear-row">
+              <input type="checkbox" name="clear_smtp_password" value="1" id="smtp-clear-pw" />
+              <label for="smtp-clear-pw" style="margin:0;font-weight:400;color:var(--text)">Clear stored password</label>
+            </div>
+          </div>
+          <div>
+            <label for="smtp-tls">TLS</label>
+            <select id="smtp-tls" name="smtp_use_tls">
+              <option value="" {% if smtp_use_tls_choice == "" %}selected{% endif %}>Default (from server environment)</option>
+              <option value="1" {% if smtp_use_tls_choice == "1" %}selected{% endif %}>On</option>
+              <option value="0" {% if smtp_use_tls_choice == "0" %}selected{% endif %}>Off</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="submit">Save</button>
+        </div>
       </form>
-      {% if notify_saved %}
+
+      {% if saved %}
       <p class="muted" style="margin:.35rem 0 0;font-size:.88rem">Saved.</p>
-      {% elif notify_err %}
-      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">That does not look like a valid email (needs @).</p>
+      {% elif err_notify %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">That does not look like a valid alert address (needs @).</p>
+      {% elif err_port %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">SMTP port must be a number between 1 and 65535.</p>
       {% endif %}
       {% if notify_email %}
       <form method="post" action="{{ url_for('send_test_notify_email') }}" style="margin:.65rem 0 0">
@@ -428,12 +517,11 @@ PREFERENCES_HTML = (
       <p class="muted" style="margin:.45rem 0 0;font-size:.88rem">Test email sent — check the inbox (and spam folder).</p>
       {% elif test_err %}
       <p class="muted" style="margin:.45rem 0 0;font-size:.88rem;color:var(--down)">
-        {% if test_err_reason == 'noaddr' %}Save an alert address above before sending a test.{% elif test_err_reason == 'nosmtp' %}The server has no outbound SMTP host configured. Set <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> in the service environment, then try again.{% else %}The test message could not be sent. Check SMTP settings and the service log.{% endif %}
+        {% if test_err_reason == 'noaddr' %}Save an alert address above before sending a test.{% elif test_err_reason == 'nosmtp' %}No SMTP host is configured. Set SMTP host here or <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> on the server, then try again.{% else %}The test message could not be sent. Check SMTP settings and the service log.{% endif %}
       </p>
       {% endif %}
-      <p class="muted settings-hint">
-        After the first sweep has completed, Pinger emails you when a new IP responds on the LAN.
-        The server also needs outbound SMTP: set <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_HOST</code> and usually <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_FROM</code> in the service environment (see unit file comments).
+      <p class="muted settings-hint" style="margin-top:.75rem">
+        After the first sweep has completed, Pinger emails the alert address when a new IP responds on the LAN.
       </p>
     </div>
   </main>
@@ -883,6 +971,45 @@ def _device_select_label(row: Any) -> str:
     return f"{nick} — (no MAC) — {ip}"
 
 
+def _smtp_prefs_template_context(conn: Any) -> dict[str, Any]:
+    """DB override field values + resolved SMTP summary for the preferences page."""
+    smtp_host_override = (dbm.get_setting(conn, "smtp_host") or "").strip()
+    smtp_port_override = (dbm.get_setting(conn, "smtp_port") or "").strip()
+    smtp_user_override = (dbm.get_setting(conn, "smtp_user") or "").strip()
+    smtp_from_override = (dbm.get_setting(conn, "smtp_from") or "").strip()
+    tls_stored = dbm.get_setting(conn, "smtp_use_tls")
+    if tls_stored is None:
+        smtp_use_tls_choice = ""
+    else:
+        smtp_use_tls_choice = (
+            "0"
+            if str(tls_stored).strip().lower() in ("0", "false", "no", "off")
+            else "1"
+        )
+    p = mailer.load_smtp_params()
+    if p:
+        tls_l = "TLS on" if p.use_tls else "TLS off"
+        auth_l = f"auth as {p.user}" if p.user else "no SMTP auth"
+        smtp_summary = (
+            f"{p.host}:{p.port}, {tls_l}, {auth_l}, From {p.from_addr}"
+        )
+    else:
+        smtp_summary = (
+            "No SMTP host configured yet — set fields below or "
+            "PINGER_SMTP_HOST on the server."
+        )
+    smtp_has_stored_password = dbm.get_setting(conn, "smtp_password") is not None
+    return {
+        "smtp_host_override": smtp_host_override,
+        "smtp_port_override": smtp_port_override,
+        "smtp_user_override": smtp_user_override,
+        "smtp_from_override": smtp_from_override,
+        "smtp_use_tls_choice": smtp_use_tls_choice,
+        "smtp_summary": smtp_summary,
+        "smtp_has_stored_password": smtp_has_stored_password,
+    }
+
+
 def create_app(runner: object) -> Flask:
     app = Flask(__name__)
     app.config["PINGER_RUNNER"] = runner
@@ -967,6 +1094,7 @@ def create_app(runner: object) -> Flask:
     @app.get("/preferences")
     def preferences_page():
         c = g.db
+        ctx = _smtp_prefs_template_context(c)
         return render_template_string(
             PREFERENCES_HTML,
             network=network_label(),
@@ -974,11 +1102,15 @@ def create_app(runner: object) -> Flask:
             last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
             now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
             notify_email=(dbm.get_setting(c, "notify_email") or ""),
-            notify_saved=request.args.get("notify") == "1",
-            notify_err=request.args.get("notify") == "0",
+            saved=request.args.get("saved") == "1"
+            or request.args.get("notify") == "1",
+            err_notify=request.args.get("notify") == "0"
+            or request.args.get("err") == "notify",
+            err_port=request.args.get("err") == "port",
             test_ok=request.args.get("test") == "1",
             test_err=request.args.get("test") == "0",
             test_err_reason=(request.args.get("reason") or "").strip(),
+            **ctx,
         )
 
     @app.get("/uptime")
@@ -1162,17 +1294,69 @@ def create_app(runner: object) -> Flask:
             return (f"Invalid IP: {exc}", 400)
         return redirect(url_for("index"))
 
+    @app.post("/settings/email")
     @app.post("/settings/notify-email")
-    def save_notify_email():
-        raw = (request.form.get("notify_email") or "").strip()
+    def save_email_settings():
+        notify = (request.form.get("notify_email") or "").strip()
+        if notify and ("@" not in notify or len(notify) > 254):
+            return redirect(url_for("preferences_page", err="notify"))
+
+        smtp_host = (request.form.get("smtp_host") or "").strip()
+        smtp_port_raw = (request.form.get("smtp_port") or "").strip()
+        smtp_user = (request.form.get("smtp_user") or "").strip()
+        smtp_from = (request.form.get("smtp_from") or "").strip()
+        smtp_pass = (request.form.get("smtp_password") or "").strip()
+        clear_pw = request.form.get("clear_smtp_password") == "1"
+        smtp_tls = (request.form.get("smtp_use_tls") or "").strip()
+
+        if smtp_port_raw:
+            try:
+                pt = int(smtp_port_raw, 10)
+                if pt < 1 or pt > 65535:
+                    raise ValueError
+            except ValueError:
+                return redirect(url_for("preferences_page", err="port"))
+
         c = g.db
-        if not raw:
-            dbm.set_setting(c, "notify_email", "")
-            return redirect(url_for("preferences_page", notify="1"))
-        if "@" not in raw or len(raw) > 254:
-            return redirect(url_for("preferences_page", notify="0"))
-        dbm.set_setting(c, "notify_email", raw)
-        return redirect(url_for("preferences_page", notify="1"))
+        with dbm.transaction(c):
+            if notify:
+                dbm.set_setting(c, "notify_email", notify)
+            else:
+                dbm.set_setting(c, "notify_email", "")
+
+            if smtp_host:
+                dbm.set_setting(c, "smtp_host", smtp_host)
+            else:
+                dbm.delete_setting(c, "smtp_host")
+
+            if smtp_port_raw:
+                dbm.set_setting(c, "smtp_port", smtp_port_raw)
+            else:
+                dbm.delete_setting(c, "smtp_port")
+
+            if smtp_user:
+                dbm.set_setting(c, "smtp_user", smtp_user)
+            else:
+                dbm.delete_setting(c, "smtp_user")
+
+            if smtp_from:
+                dbm.set_setting(c, "smtp_from", smtp_from)
+            else:
+                dbm.delete_setting(c, "smtp_from")
+
+            if smtp_pass:
+                dbm.set_setting(c, "smtp_password", smtp_pass)
+            elif clear_pw:
+                dbm.delete_setting(c, "smtp_password")
+
+            if smtp_tls == "1":
+                dbm.set_setting(c, "smtp_use_tls", "1")
+            elif smtp_tls == "0":
+                dbm.set_setting(c, "smtp_use_tls", "0")
+            else:
+                dbm.delete_setting(c, "smtp_use_tls")
+
+        return redirect(url_for("preferences_page", saved="1"))
 
     @app.post("/settings/test-email")
     def send_test_notify_email():
@@ -1180,7 +1364,7 @@ def create_app(runner: object) -> Flask:
         to_addr = (dbm.get_setting(c, "notify_email") or "").strip()
         if not to_addr:
             return redirect(url_for("preferences_page", test="0", reason="noaddr"))
-        if not config.SMTP_HOST:
+        if not mailer.smtp_configured():
             return redirect(url_for("preferences_page", test="0", reason="nosmtp"))
         try:
             mailer.send_test_email(to_addr)

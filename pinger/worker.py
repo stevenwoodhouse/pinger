@@ -131,7 +131,7 @@ class SweepRunner:
             dbm.set_last_sweep_finished(conn, dbm.now())
 
         to_addr = (dbm.get_setting(conn, "notify_email") or "").strip()
-        if new_device_alerts and to_addr and config.SMTP_HOST:
+        if new_device_alerts and to_addr and mailer.smtp_configured():
             net_label = str(net)
             for ip_a, mac_a, did, lat in new_device_alerts:
                 try:
@@ -147,9 +147,10 @@ class SweepRunner:
                     log.exception(
                         "Failed to send new-device alert for ip=%s", ip_a
                     )
-        elif new_device_alerts and to_addr and not config.SMTP_HOST:
+        elif new_device_alerts and to_addr and not mailer.smtp_configured():
             log.warning(
-                "notify_email is set but PINGER_SMTP_HOST is empty; "
+                "notify_email is set but no SMTP host is configured "
+                "(preferences or PINGER_SMTP_HOST); "
                 "skipping %d new-device alert(s)",
                 len(new_device_alerts),
             )

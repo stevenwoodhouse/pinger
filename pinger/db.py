@@ -118,6 +118,10 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
+def delete_setting(conn: sqlite3.Connection, key: str) -> None:
+    conn.execute("DELETE FROM pinger_settings WHERE key = ?", (key,))
+
+
 def get_or_create_device(conn: sqlite3.Connection, ip: str) -> tuple[int, bool]:
     ip = str(ipaddress.IPv4Address(ip))
     row = conn.execute("SELECT id FROM devices WHERE ip = ?", (ip,)).fetchone()
