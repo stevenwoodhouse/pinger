@@ -25,6 +25,7 @@ from flask import (
 
 from pinger import config
 from pinger import db as dbm
+from pinger import mail as mailer
 
 STYLES_CORE = r"""
     :root {
@@ -298,33 +299,14 @@ INDEX_HTML = (
       <h1>LAN ping monitor</h1>
       <div class="muted">Scan: {{ network }} · Interval: {{ interval }} · Retention: {{ retention }}d</div>
       <div class="muted" style="font-size:.88rem;margin-top:.35rem">Last sweep: {{ last_sweep }}</div>
-      <div class="navlinks"><a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a></div>
+      <div class="navlinks">
+        <a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('preferences_page') }}">Preferences</a>
+      </div>
     </div>
       <div class="muted">Server time: {{ now }}</div>
   </header>
-  <section class="dash-settings" aria-labelledby="email-alerts-heading">
-    <!-- pinger-notify-settings -->
-    <div class="dash-settings-inner">
-      <h2 class="settings-heading" id="email-alerts-heading">New-device email alerts</h2>
-      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-dash-form">
-        <div class="notify-field">
-          <label for="notify-email">Send alerts to this address</label>
-          <input id="notify-email" name="notify_email" type="text" inputmode="email" autocomplete="email"
-            value="{{ notify_email }}" placeholder="you@example.com — leave empty to turn off" />
-        </div>
-        <button type="submit">Save</button>
-      </form>
-      {% if notify_saved %}
-      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem">Saved.</p>
-      {% elif notify_err %}
-      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">That does not look like a valid email (needs @).</p>
-      {% endif %}
-      <p class="muted settings-hint">
-        After the first sweep has completed, Pinger emails you when a new IP responds on the LAN.
-        The server also needs outbound SMTP: set <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_HOST</code> and usually <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_FROM</code> in the service environment (see unit file comments).
-      </p>
-    </div>
-  </section>
   <main>
     {% if sweep_started %}
     <p class="muted" style="margin:0 0 1rem 0;">
@@ -395,6 +377,72 @@ INDEX_HTML = (
 """
 )
 
+PREFERENCES_HTML = (
+    r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Pinger — Preferences</title>
+  <style>"""
+    + STYLES_CORE
+    + r"""</style>
+</head>
+<body>
+  <div class="shell">
+  <header>
+    <div>
+      <h1>Preferences</h1>
+      <div class="muted">Scan: {{ network }} · Retention: {{ retention }}d</div>
+      <div class="muted" style="font-size:.88rem;margin-top:.35rem">Last sweep: {{ last_sweep }}</div>
+      <div class="navlinks">
+        <a href="{{ url_for('index') }}">Dashboard</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('uptime_page') }}">{{ retention }}d uptime history</a>
+      </div>
+    </div>
+    <div class="muted">Server time: {{ now }}</div>
+  </header>
+  <main>
+    <div class="dash-settings-inner" style="max-width:100%;box-sizing:border-box;">
+      <h2 class="settings-heading" id="email-alerts-heading">New-device email alerts</h2>
+      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-dash-form">
+        <div class="notify-field">
+          <label for="notify-email">Send alerts to this address</label>
+          <input id="notify-email" name="notify_email" type="text" inputmode="email" autocomplete="email"
+            value="{{ notify_email }}" placeholder="you@example.com — leave empty to turn off" />
+        </div>
+        <button type="submit">Save</button>
+      </form>
+      {% if notify_saved %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem">Saved.</p>
+      {% elif notify_err %}
+      <p class="muted" style="margin:.35rem 0 0;font-size:.88rem;color:var(--down)">That does not look like a valid email (needs @).</p>
+      {% endif %}
+      {% if notify_email %}
+      <form method="post" action="{{ url_for('send_test_notify_email') }}" style="margin:.65rem 0 0">
+        <button type="submit">Send test email</button>
+      </form>
+      {% endif %}
+      {% if test_ok %}
+      <p class="muted" style="margin:.45rem 0 0;font-size:.88rem">Test email sent — check the inbox (and spam folder).</p>
+      {% elif test_err %}
+      <p class="muted" style="margin:.45rem 0 0;font-size:.88rem;color:var(--down)">
+        {% if test_err_reason == 'noaddr' %}Save an alert address above before sending a test.{% elif test_err_reason == 'nosmtp' %}The server has no outbound SMTP host configured. Set <code style="background:#243049;padding:1px 5px;border-radius:4px">PINGER_SMTP_HOST</code> in the service environment, then try again.{% else %}The test message could not be sent. Check SMTP settings and the service log.{% endif %}
+      </p>
+      {% endif %}
+      <p class="muted settings-hint">
+        After the first sweep has completed, Pinger emails you when a new IP responds on the LAN.
+        The server also needs outbound SMTP: set <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_HOST</code> and usually <code style="background:#243049;padding:1px 6px;border-radius:4px">PINGER_SMTP_FROM</code> in the service environment (see unit file comments).
+      </p>
+    </div>
+  </main>
+  </div>
+</body>
+</html>
+"""
+)
+
 UPTIME_HTML = (
     r"""<!doctype html>
 <html lang="en">
@@ -416,6 +464,8 @@ UPTIME_HTML = (
       <div class="muted" style="font-size:.88rem;margin-top:.35rem">Last sweep: {{ last_sweep }}</div>
       <div class="navlinks">
         <a href="{{ url_for('index') }}">Dashboard</a>
+        <span class="muted"> · </span>
+        <a href="{{ url_for('preferences_page') }}">Preferences</a>
         <span class="muted"> · </span>
         <a href="{{ url_for('uptime_page') }}">All devices</a>
       </div>
@@ -912,9 +962,23 @@ def create_app(runner: object) -> Flask:
             last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
             now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
             sweep_started=request.args.get("sweep") == "1",
+        )
+
+    @app.get("/preferences")
+    def preferences_page():
+        c = g.db
+        return render_template_string(
+            PREFERENCES_HTML,
+            network=network_label(),
+            retention=config.RETENTION_DAYS,
+            last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
+            now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
             notify_email=(dbm.get_setting(c, "notify_email") or ""),
             notify_saved=request.args.get("notify") == "1",
             notify_err=request.args.get("notify") == "0",
+            test_ok=request.args.get("test") == "1",
+            test_err=request.args.get("test") == "0",
+            test_err_reason=(request.args.get("reason") or "").strip(),
         )
 
     @app.get("/uptime")
@@ -1104,11 +1168,26 @@ def create_app(runner: object) -> Flask:
         c = g.db
         if not raw:
             dbm.set_setting(c, "notify_email", "")
-            return redirect(url_for("index", notify="1"))
+            return redirect(url_for("preferences_page", notify="1"))
         if "@" not in raw or len(raw) > 254:
-            return redirect(url_for("index", notify="0"))
+            return redirect(url_for("preferences_page", notify="0"))
         dbm.set_setting(c, "notify_email", raw)
-        return redirect(url_for("index", notify="1"))
+        return redirect(url_for("preferences_page", notify="1"))
+
+    @app.post("/settings/test-email")
+    def send_test_notify_email():
+        c = g.db
+        to_addr = (dbm.get_setting(c, "notify_email") or "").strip()
+        if not to_addr:
+            return redirect(url_for("preferences_page", test="0", reason="noaddr"))
+        if not config.SMTP_HOST:
+            return redirect(url_for("preferences_page", test="0", reason="nosmtp"))
+        try:
+            mailer.send_test_email(to_addr)
+        except Exception:
+            slog.exception("Test email failed for %s", to_addr)
+            return redirect(url_for("preferences_page", test="0", reason="send"))
+        return redirect(url_for("preferences_page", test="1"))
 
     @app.get("/api/status")
     def api_status():
