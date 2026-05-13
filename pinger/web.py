@@ -71,7 +71,7 @@ STYLES_CORE = r"""
       align-items: center; margin-bottom: 1rem;
       min-width: 0;
     }
-    button, input[type=text] {
+    button, input[type=text], input[type=email] {
       background: var(--panel); border: 1px solid #2c3d5c;
       color: var(--text); padding: .45rem .7rem; border-radius: 8px;
       font: inherit;
@@ -151,13 +151,16 @@ STYLES_CORE = r"""
     .spark i.unk { background: #2c3548; }
     form.inline { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; min-width: 0; }
     form.inline input[type=text] { flex: 1 1 8rem; min-width: 0; }
-    form.notify-form { display: flex; flex-wrap: wrap; gap: .5rem .65rem; align-items: center; margin-top: .85rem;
-      padding: .75rem .85rem; background: var(--panel); border: 1px solid #2c3d5c; border-radius: 10px; max-width: 100%; }
-    form.notify-form label { color: var(--muted); font-size: .88rem; }
-    form.notify-form input[type=email] {
-      background: #141c2a; border: 1px solid #2c3d5c; color: var(--text);
-      padding: .45rem .65rem; border-radius: 8px; font: inherit; flex: 1 1 14rem; min-width: 0;
+    form.notify-toolbar {
+      display: flex; flex-wrap: wrap; gap: .45rem .55rem; align-items: center; margin: 0;
+      flex: 1 1 18rem; min-width: min(100%, 12rem); max-width: 100%;
+      padding: .5rem .65rem; border: 1px solid #3f5e8a; border-radius: 10px;
+      background: linear-gradient(160deg, #1e2d45 0%, #1a2535 100%);
     }
+    form.notify-toolbar .notify-lab {
+      font-size: .82rem; font-weight: 600; color: var(--text); letter-spacing: .02em;
+    }
+    form.notify-toolbar input[type=email] { flex: 1 1 11rem; min-width: 0; }
     @media (max-width: 22rem) {
       form.inline { flex-direction: column; align-items: stretch; }
       form.inline button { width: 100%; }
@@ -276,13 +279,14 @@ INDEX_HTML = (
         <input name="nickname" type="text" placeholder="Optional nickname" />
         <button type="submit">Add / watch</button>
       </form>
+      <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-toolbar">
+        <span class="notify-lab" id="notify-email-label">Alert email</span>
+        <input id="notify-email" name="notify_email" type="email" inputmode="email" autocomplete="email"
+          aria-labelledby="notify-email-label"
+          value="{{ notify_email }}" placeholder="New-device notifications" />
+        <button type="submit">Save</button>
+      </form>
     </div>
-    <form method="post" action="{{ url_for('save_notify_email') }}" class="notify-form">
-      <label for="notify-email">Email for new-device alerts</label>
-      <input id="notify-email" name="notify_email" type="email" inputmode="email" autocomplete="email"
-        value="{{ notify_email }}" placeholder="Leave empty to disable" />
-      <button type="submit">Save</button>
-    </form>
     {% if notify_saved %}
     <p class="muted" style="margin:.45rem 0 0;font-size:.85rem">Alert address saved.</p>
     {% elif notify_err %}
@@ -791,6 +795,7 @@ def create_app(runner: object) -> Flask:
     @app.before_request
     def _open_db() -> None:
         g.db = dbm.connect(config.DB_PATH)
+        dbm.init_schema(g.db)
 
     @app.teardown_appcontext
     def _close_db(_exc: object | None = None) -> None:
