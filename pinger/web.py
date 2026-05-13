@@ -186,19 +186,17 @@ STYLES_CORE = r"""
       max-height: 8rem; overflow: auto;
     }
     .spark {
-      display: flex; gap: 2px; align-items: flex-end;
+      display: flex; gap: 1px; align-items: stretch;
       height: 28px; margin-top: .6rem;
       width: 100%;
       max-width: 100%;
       min-width: 0;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      -webkit-overflow-scrolling: touch;
     }
     .spark i {
-      flex: 1 1 3px;
-      min-width: 3px;
-      border-radius: 2px;
+      flex: 1 1 0;
+      min-width: 0;
+      align-self: stretch;
+      border-radius: 1px;
       background: var(--spark-mid);
     }
     .spark i.on { background: var(--up); }
