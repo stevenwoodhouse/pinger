@@ -134,6 +134,8 @@ class SweepRunner:
         if new_device_alerts and to_addr and mailer.smtp_configured():
             net_label = str(net)
             for ip_a, mac_a, did, lat in new_device_alerts:
+                row = dbm.get_device_by_id(conn, did)
+                nick = (row["nickname"] or "").strip() if row else ""
                 try:
                     mailer.send_new_device_alert(
                         to_addr,
@@ -142,6 +144,7 @@ class SweepRunner:
                         device_id=did,
                         latency_ms=lat,
                         network=net_label,
+                        nickname=nick or None,
                     )
                 except Exception:
                     log.exception(

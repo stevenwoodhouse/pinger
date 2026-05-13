@@ -169,16 +169,20 @@ def send_new_device_alert(
     device_id: int,
     latency_ms: float | None,
     network: str,
+    nickname: str | None = None,
 ) -> None:
     """Send a plain-text email. No-op if SMTP host is not configured."""
     smtp = load_smtp_params()
     if not smtp:
         return
 
-    subject = f"[Pinger] New device: {ip}"
+    nick = (nickname or "").strip()
+    display_name = nick or "Unknown Device"
+    subject = f"[Pinger] New device: {display_name} ({ip})"
     lines = [
         "A host responded on the LAN that was not in the database before this sweep.",
         "",
+        f"Device: {display_name}",
         f"IP: {ip}",
         f"MAC (from ARP if seen): {mac or '(none)'}",
         f"Device row id: {device_id}",
