@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from ipaddress import IPv4Address
+from pathlib import Path
 from collections.abc import Iterable
 from typing import Any
 
@@ -23,9 +25,30 @@ from flask import (
     url_for,
 )
 
+from pinger import __version__ as PINGER_VERSION
 from pinger import config
 from pinger import db as dbm
 from pinger import mail as mailer
+
+
+def _compute_deploy_ts() -> float:
+    """Best-effort deploy time: latest mtime of any .py file in the pinger package."""
+    pkg_dir = Path(__file__).resolve().parent
+    latest = 0.0
+    try:
+        for p in pkg_dir.rglob("*.py"):
+            try:
+                m = os.path.getmtime(p)
+            except OSError:
+                continue
+            if m > latest:
+                latest = m
+    except OSError:
+        pass
+    return latest
+
+
+DEPLOY_TS = _compute_deploy_ts()
 
 STYLES_CORE = r"""
     :root {
@@ -284,6 +307,17 @@ STYLES_CORE = r"""
     a { color: var(--accent); }
     .navlinks { margin-top: .35rem; font-size: .88rem; }
     .navlinks a { font-weight: 500; }
+    footer.app-footer {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 1rem clamp(0.75rem, 3vw, 1.25rem) 1.25rem;
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .8rem;
+      text-align: center;
+      line-height: 1.5;
+    }
 
     @media (prefers-color-scheme: light) {
       :root {
@@ -490,6 +524,9 @@ INDEX_HTML = (
       {% endfor %}
     </div>
   </main>
+  <footer class="app-footer">
+    Pinger v{{ version }} · Deployed: {{ deployed }}
+  </footer>
   </div>
 </body>
 </html>
@@ -609,6 +646,9 @@ PREFERENCES_HTML = (
       </p>
     </div>
   </main>
+  <footer class="app-footer">
+    Pinger v{{ version }} · Deployed: {{ deployed }}
+  </footer>
   </div>
 </body>
 </html>
@@ -721,6 +761,9 @@ UPTIME_HTML = (
     <p class="muted">No devices yet.</p>
     {% endfor %}
   </main>
+  <footer class="app-footer">
+    Pinger v{{ version }} · Deployed: {{ deployed }}
+  </footer>
   </div>
 </body>
 </html>
@@ -1173,6 +1216,8 @@ def create_app(runner: object) -> Flask:
             last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
             now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
             sweep_started=request.args.get("sweep") == "1",
+            version=PINGER_VERSION,
+            deployed=_fmt_ts_local(DEPLOY_TS) if DEPLOY_TS > 0 else "unknown",
         )
 
     @app.get("/preferences")
@@ -1194,6 +1239,8 @@ def create_app(runner: object) -> Flask:
             test_ok=request.args.get("test") == "1",
             test_err=request.args.get("test") == "0",
             test_err_reason=(request.args.get("reason") or "").strip(),
+            version=PINGER_VERSION,
+            deployed=_fmt_ts_local(DEPLOY_TS) if DEPLOY_TS > 0 else "unknown",
             **ctx,
         )
 
@@ -1334,6 +1381,8 @@ def create_app(runner: object) -> Flask:
             last_sweep=_fmt_ts_local(dbm.get_last_sweep_finished(c)),
             network=network_label(),
             now=datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
+            version=PINGER_VERSION,
+            deployed=_fmt_ts_local(DEPLOY_TS) if DEPLOY_TS > 0 else "unknown",
         )
 
     @app.post("/action/sweep")
